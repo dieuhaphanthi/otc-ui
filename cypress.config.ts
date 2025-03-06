@@ -7,7 +7,8 @@ config();
 
 export default defineConfig({
     e2e: {
-        baseUrl: 'https://dev.unich.com/en/otc',
+        // baseUrl: 'https://dev.unich.com/en/otc',
+        baseUrl: 'https://unich.com/en/otc', // chạy github action
         specPattern: "e2e/**/*.{spec,cy}.{js,ts}",
         supportFile: 'e2e/support/e2e.ts',
         setupNodeEvents(on, config) {
