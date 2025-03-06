@@ -1,17 +1,22 @@
 {
     "compilerOptions": {
-      "target": "ES6",
-      "lib": ["ES6", "DOM"],
-      "module": "commonjs",
-      "strict": true,
-      "esModuleInterop": true,
-      "types": ["cypress", "node"]
+        "target": "ES6",
+        "lib": [
+            "ES6",
+            "DOM"
+        ],
+        "module": "commonjs",
+        "strict": true,
+        "esModuleInterop": true,
+        "types": [
+            "cypress",
+            "node"
+        ]
     },
     "include": [
-      "e2e/**/*.ts"
+        "e2e/**/*.ts"
     ],
     "exclude": [
-      "node_modules"
+        "node_modules"
     ]
-  }
-  
+}

@@ -3,5 +3,12 @@
     "@types/node": "^22.13.5",
     "cypress": "^14.1.0",
     "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "axios": "^1.8.1",
+    "dotenv": "^16.4.7"
+  },
+  "scripts": {
+    "cy:run-api-monitor": "cypress run --spec 'e2e/monitoring/api-monitor.spec.ts'"
   }
 }

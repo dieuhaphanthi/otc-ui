@@ -1,0 +1,26 @@
+name: API Monitor Cron Job
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # Chạy mỗi 5 phút 
+  workflow_dispatch:         # Cho phép chạy thủ công từ giao diện Actions
+
+jobs:
+  run-monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'  # Chọn phiên bản Node phù hợp
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Cypress API Monitor
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: npm run cy:run-api-monitor -- --spec "e2e/monitoring/api-monitor.spec.ts"
