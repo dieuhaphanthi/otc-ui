@@ -2,7 +2,7 @@ name: API Monitor Cron Job
 
 on:
   schedule:
-    - cron: '*/5 * * * *'   # Chạy mỗi 5 phút 
+    cron: '5,10,15,20,25,30,35,40,45,50,55 * * * *'  # Chạy 5p 1 lần
   workflow_dispatch:         # Cho phép chạy thủ công từ giao diện Actions
 
 jobs:
