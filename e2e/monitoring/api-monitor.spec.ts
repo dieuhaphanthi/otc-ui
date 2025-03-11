@@ -42,7 +42,7 @@ describe("API Monitoring", () => {
             expect(response.status).to.be.lessThan(500);
             // Nếu API chạy bình thường (status < 500), gửi thông báo lên Discord =))
             if (response.status < 500) {
-                cy.task("discordNotify", `API Running Normally: Received status ${response.status} for https://api.unich.com/trading/order/v1/markets?limit=200`);
+                // cy.task("discordNotify", `API Running Normally: Received status ${response.status} for https://api.unich.com/trading/order/v1/markets?limit=200`);
             }
         });
     });
