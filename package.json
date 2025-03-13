@@ -9,6 +9,7 @@
     "dotenv": "^16.4.7"
   },
   "scripts": {
-    "cy:run-api-monitor": "cypress run --spec 'e2e/monitoring/api-monitor.spec.ts'"
+    "cy:run-api-monitor": "cypress run --spec 'e2e/monitoring/api-monitor.spec.ts'",
+    "cy:run-chart": "cypress run --spec 'e2e/chart/test_chart.cy.ts'"
   }
 }
