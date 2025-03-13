@@ -1,0 +1,27 @@
+name: Chart Test Cron Job
+
+on:
+  schedule:
+    # 8:00 UTC+7 = 1:00 UTC, 13:00 UTC+7 = 6:00 UTC
+    - cron: '0 1,6 * * *'
+  workflow_dispatch:
+
+jobs:
+  run-chart-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Cypress Chart Test
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: npm run cy:run-chart -- --spec "e2e/chart/test_chart.cy.ts"
