@@ -37,9 +37,9 @@ function chunkString(str: string, maxLength: number): string[] {
 }
 
 /**
- * Hàm parse chuỗi epoch trả về mili-giây.
+ * Hàm parse chuỗi epoch trả về ms.
  * - Nếu số nhỏ hơn 1e12 (ví dụ 10 chữ số) thì coi như epoch tính theo giây → nhân 1000.
- * - Nếu không thì coi như epoch tính theo mili-giây.
+ * - Nếu không thì coi như epoch tính theo ms.
  */
 function parseEpoch(timeStr: string): number {
     const num = parseFloat(timeStr);
@@ -53,22 +53,44 @@ function parseEpoch(timeStr: string): number {
 }
 
 /**
+ * Múi giờ của trade.created_at là UTC+7.
+ * Để so sánh với chart (UTC), ta cần chuyển created_at về UTC bằng cách trừ đi 7 tiếng.
+ * Cái này là do bên trade thì đang là UTC+7, mà bên chart lại là UTC
+ */
+const UTC7_OFFSET = 7 * 3600 * 1000;
+
+/**
+ * Hàm chuyển đổi thời gian từ chuỗi (trade.created_at) về giá trị ms UTC.
+ */
+function getAdjustedTime(timeStr: string): number {
+    return Date.parse(timeStr) - UTC7_OFFSET;
+}
+
+/**
+ * Hàm chuyển đổi thời gian từ chuỗi (trade.created_at) về chuỗi ISO theo UTC.
+ */
+function getAdjustedTimeISO(timeStr: string): string {
+    return new Date(getAdjustedTime(timeStr)).toISOString();
+}
+
+/**
  * Hàm tìm trade có trade_time <= chartTime và gần chartTime nhất (về phía trước).
- * Lưu ý: trade.created_at của API trade/latest có dạng ISO, nên dùng Date.parse(trade.created_at) trả về mili-giây.
+ * Lưu ý: trade.created_at của API trade/latest ban đầu là UTC+7, nên chúng ta chuyển nó về UTC.
+ * Đã nhắc đến ở phía trên
  */
 function findNearestTradeBefore(trades: any[], chartTime: number): any | null {
     if (!trades || trades.length === 0) return null;
 
-    // Sắp xếp trade theo created_at tăng dần
+    // Sắp xếp trade theo created_at tăng dần (đã chuyển về UTC)
     const sortedTrades = [...trades].sort(
-        (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)
+        (a, b) => getAdjustedTime(a.created_at) - getAdjustedTime(b.created_at)
     );
 
     let nearestTrade: any = null;
     let minTimeDiff = Infinity;
 
     for (const trade of sortedTrades) {
-        const tradeTime = Date.parse(trade.created_at);
+        const tradeTime = getAdjustedTime(trade.created_at);
         // Chỉ xét trade xảy ra trước hoặc đúng chartTime
         if (tradeTime > chartTime) {
             continue;
@@ -133,7 +155,7 @@ describe('Chart API Test', () => {
                 cy.log(`Processing market_id: ${marketId}`);
                 cy.wait(5000);
 
-                // Bước 2: Gọi API trade/latest => tối đa 50 trade (dữ liệu dạng ISO)
+                // Bước 2: Gọi API trade/latest => tối đa 50 trade (dữ liệu dạng ISO, thời gian trade là UTC+7)
                 cy.request({
                     method: 'GET',
                     url: `https://api.unich.com/trading/order/v1/trade/latest?market_id=${marketId}`,
@@ -163,17 +185,18 @@ describe('Chart API Test', () => {
                         return;
                     }
 
-                    // Sắp xếp tradeData theo created_at giảm dần
+                    // Sắp xếp tradeData theo created_at giảm dần (sau khi chuyển về UTC)
                     tradeData.sort(
-                        (a: any, b: any) => Date.parse(b.created_at) - Date.parse(a.created_at)
+                        (a: any, b: any) => getAdjustedTime(b.created_at) - getAdjustedTime(a.created_at)
                     );
 
-                    // Lấy trade có created_at xa nhất và gần nhất
+                    // Lấy trade có created_at sớm nhất và muộn nhất (theo thời gian đã điều chỉnh)
                     const tradeEarliest = tradeData[tradeData.length - 1]; // created_at sớm nhất
                     const tradeLatest = tradeData[0];                      // created_at muộn nhất
 
-                    const earliestTime = Date.parse(tradeEarliest.created_at);
-                    const latestTime = Date.parse(tradeLatest.created_at);
+                    // Tính khoảng thời gian truyền cho API chart (đã chuyển sang UTC)
+                    const earliestTime = getAdjustedTime(tradeEarliest.created_at);
+                    const latestTime = getAdjustedTime(tradeLatest.created_at);
 
                     // Lưu lại trade
                     latestTradeMap[marketId] = tradeData;
@@ -181,7 +204,7 @@ describe('Chart API Test', () => {
                     // Tạo set rỗng ban đầu để đánh dấu trade_id đã log
                     loggedTradeIds[marketId] = new Set();
 
-                    // Bước 3: Gọi API chart (dữ liệu dạng epoch)
+                    // Bước 3: Gọi API chart (dữ liệu dạng epoch, thời gian chart là UTC)
                     cy.request({
                         method: 'GET',
                         url: `https://api.unich.com/trading/order/chart?market_id=${marketId}&coin=${tradeData[0].coin}¤cy=${tradeData[0].currency}&interval=30m&from=${earliestTime}&time=${latestTime}`,
@@ -218,17 +241,17 @@ describe('Chart API Test', () => {
                                 return;
                             }
 
-                            // Kiểm tra nếu điểm chart có OHLC giống nhau
+                            // Xác định điều kiện lỗi theo yêu cầu:
+                            // - Nếu 4 giá trị OHLC giống nhau OR volume = 0
+                            // - Nhưng nếu cả hai điều kiện (OHLC giống nhau AND volume = 0) thì KHÔNG tính là lỗi
                             const isEqualOHLC = (
                                 item.open === item.close &&
                                 item.close === item.high &&
                                 item.high === item.low
                             );
-
                             const isZeroVolume = (item.volume === '0');
 
-                            // Nếu gặp lỗi (OHLC all equal hoặc volume = 0)
-                            if (isEqualOHLC || isZeroVolume) {
+                            if ((isEqualOHLC || isZeroVolume) && !(isEqualOHLC && isZeroVolume)) {
                                 erroneousItems.push({
                                     index,
                                     epochTime, // dùng để so sánh
@@ -265,12 +288,15 @@ describe('Chart API Test', () => {
 
                         // Tạo thông báo lỗi từ tradeToChartMap
                         if (Object.keys(tradeToChartMap).length > 0) {
-                            let msg = `\nMarket ${marketId} có ${Object.keys(tradeToChartMap).length} trade liên quan đến dữ liệu lỗi:\n`;
+                            let msg = `\n--------------Market ${marketId} có ${Object.keys(tradeToChartMap).length} trade liên quan đến dữ liệu lỗi:-------------\n`;
                             Object.values(tradeToChartMap).forEach(({ chartItem, trade }) => {
-                                msg += `Trade Info: trade_id=${trade.trade_id}, trade_time=${trade.created_at}, price=${trade.price}, volume=${trade.volume}\n`;
-                                msg += `  * Nearest Chart Error: [Index=${chartItem.index}, chartTime=${chartItem.isoTime}] `
-                                    + `(open=${chartItem.open}, close=${chartItem.close}, high=${chartItem.high}, low=${chartItem.low}, volume=${chartItem.volume}) `
-                                    + `=> reason: ${chartItem.reason}\n`;
+                                // Lấy thời gian trade đã điều chỉnh để log
+                                const adjustedTradeTime = getAdjustedTimeISO(trade.created_at);
+                                msg += `\n`;
+                                msg += `Trade Info: trade_id=${trade.trade_id}, trade_time=${adjustedTradeTime}, price=${trade.price}, volume=${trade.volume}\n`;
+                                msg += `  * Nearest Chart Error: [Index=${chartItem.index}, chartTime=${chartItem.isoTime}] `;
+                                msg += `(open=${chartItem.open}, close=${chartItem.close}, high=${chartItem.high}, low=${chartItem.low}, volume=${chartItem.volume}) `;
+                                msg += `=> reason: ${chartItem.reason}\n============================================================\n`;
                             });
                             allErrorMessages.push(msg);
                         }
