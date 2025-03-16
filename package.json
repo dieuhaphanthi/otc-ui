@@ -10,6 +10,7 @@
   },
   "scripts": {
     "cy:run-api-monitor": "cypress run --spec 'e2e/monitoring/api-monitor.spec.ts'",
-    "cy:run-chart": "cypress run --spec 'e2e/chart/test_chart.cy.ts'"
+    "cy:run-chart": "cypress run --spec 'e2e/chart/test_chart.cy.ts'",
+    "cy:run-orderbook": "cypress run --spec 'e2e/orderbook/compare_OB_with_latest.cy.ts'"
   }
 }
